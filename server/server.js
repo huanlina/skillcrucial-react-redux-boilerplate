@@ -53,7 +53,7 @@ function doesFileExist () {
   return readFile(`${__dirname}/users.json`, { encoding: "utf8" })
     .then((file) => {
       return JSON.parse(file)
-    })
+    }) 
     .catch( async () => {
       const users = await axios('https://jsonplaceholder.typicode.com/users')
         .then(result => JSON.stringify(result.data))
