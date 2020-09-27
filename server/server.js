@@ -10,7 +10,7 @@ import cookieParser from 'cookie-parser'
 import config from './config'
 import Html from '../client/html'
 
-const { writeFile } = require("fs").promises
+const { writeFile, readFile, unlink } = require("fs").promises
 
 const Root = () => ''
 
@@ -49,26 +49,61 @@ const middleware = [
 ]
 middleware.forEach((it) => server.use(it))
 
+function doesFileExist () {
+  return readFile(`${__dirname}/users.json`, { encoding: "utf8" })
+    .then((file) => {
+      return JSON.parse(file)
+    })
+    .catch( async () => {
+      const users = await axios('https://jsonplaceholder.typicode.com/users')
+        .then(result => JSON.stringify(result.data))
+      writeFile(`${__dirname}/users.json`, users, { encoding: "utf8" })
+      return users.sort((a, b) => a.id - b.id)
+    })
+}
+
+function toWriteFile(fileData) {
+  writeFile(`${__dirname}/users.json`, JSON.stringify(fileData), 'utf8' )
+}
+
 server.get('/api/v1/users/', async (req, res) => {  
-  const users = await axios('https://jsonplaceholder.typicode.com/users').then(result => JSON.stringify(result.data))  
-  writeFile(`${__dirname}/users.json`, users, { encoding: "utf8" })
-  res.json(JSON.parse(users))  
+  const result = await doesFileExist()
+  res.json(result)  
 })  
 
-server.post('/api/v1/users',  (req, res) => {  
-  res.json( { id: '', ...req.body })  
+server.post('/api/v1/users', async (req, res) => {  
+  const newUser = req.body
+  const userData = await doesFileExist()
+  newUser.id = (userData.length === 0) ? 1 : userData[userData.length - 1].id + 1
+  toWriteFile([...userData, newUser])
+  res.json({status: 'success', id: newUser.id})  
 }) 
 
-// server.get('/api/v1/users/take/:number', async (req, res) => {  
-//   const { number } = req.params  
-//   const { data: users } = await axios('https://jsonplaceholder.typicode.com/users')  
-//   res.json(users.slice(0, +number))  
-// })  
+server.patch('/api/v1/users/:userId', async (req, res) => {  
+  const { userId } = req.params
+  const newUser = req.body
+  const arr = await doesFileExist()
+  const objId = arr.find((obj) => obj.id === +userId)
+  const objId2 = { ...objId, ...newUser }
+  const newArr = arr.map((obj) => obj.id === objId2.id ? objId2 : obj)
+  toWriteFile(newArr)
+  res.json({status: 'success', id: userId})  
+}) 
 
-// server.get('/api/v1/users/:name', (req, res) => {  
-//   const { name } = req.params  
-//   res.json({ name })  
-// })  
+server.delete('/api/v1/users/:userId', async (req, res) => {
+  const { userId } = req.params
+  const arr = await doesFileExist()
+  const objId = arr.find((obj) => obj.id === +userId)
+  const newArr = arr.filter((obj) => obj.id !== objId.id)
+  toWriteFile(newArr)
+  res.json({ status: 'success', id: userId })
+})
+
+server.delete('/api/v1/users', (req, res) => {
+  unlink(`${__dirname}/users.json`)
+    .then(() => res.json({ status: "success" }))
+    .catch(() => res.send('no file'))
+})
 
 server.use('/api/', (req, res) => {
   res.status(404)
