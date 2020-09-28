@@ -50,14 +50,14 @@ const middleware = [
 middleware.forEach((it) => server.use(it))
 
 function doesFileExist () {
-  return readFile(`${__dirname}/users.json`, { encoding: "utf8" })
+  return readFile(`${__dirname}/users.json`)
     .then((file) => {
       return JSON.parse(file)
     }) 
     .catch( async () => {
       const users = await axios('https://jsonplaceholder.typicode.com/users')
-        .then(result => JSON.stringify(result.data))
-      writeFile(`${__dirname}/users.json`, users, { encoding: "utf8" })
+        .then(result => result.data)
+      writeFile(`${__dirname}/users.json`, JSON.stringify(users), { encoding: "utf8" })
       return users.sort((a, b) => a.id - b.id)
     })
 }
